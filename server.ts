@@ -88,7 +88,14 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Request logging middleware
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+  });
+
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
   app.use("/uploads", express.static(uploadDir));
 
   // Health check
@@ -136,8 +143,12 @@ async function startServer() {
         "INSERT INTO employees (name, nip, position, category, division, education, religion, phone, email, doc_ktp, doc_sk_pangkat, doc_sk_berkala, doc_sk_jabatan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ).run(name, finalNip, position, category, division, education, religion, phone, email, doc_ktp, doc_sk_pangkat, doc_sk_berkala, doc_sk_jabatan);
       res.status(201).json({ id: info.lastInsertRowid });
-    } catch (error) {
-      res.status(400).json({ error: error.message });
+    } catch (error: any) {
+      let message = error.message;
+      if (message.includes("UNIQUE constraint failed: employees.nip")) {
+        message = "NIP sudah terdaftar. Silakan gunakan NIP lain atau kosongkan jika tidak ada.";
+      }
+      res.status(400).json({ error: message });
     }
   });
 
@@ -167,8 +178,12 @@ async function startServer() {
         "UPDATE employees SET name = ?, nip = ?, position = ?, category = ?, division = ?, education = ?, religion = ?, phone = ?, email = ?, doc_ktp = ?, doc_sk_pangkat = ?, doc_sk_berkala = ?, doc_sk_jabatan = ? WHERE id = ?"
       ).run(name, finalNip, position, category, division, education, religion, phone, email, doc_ktp, doc_sk_pangkat, doc_sk_berkala, doc_sk_jabatan, id);
       res.json({ success: true });
-    } catch (error) {
-      res.status(400).json({ error: error.message });
+    } catch (error: any) {
+      let message = error.message;
+      if (message.includes("UNIQUE constraint failed: employees.nip")) {
+        message = "NIP sudah terdaftar. Silakan gunakan NIP lain.";
+      }
+      res.status(400).json({ error: message });
     }
   });
 
@@ -178,9 +193,14 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  // Catch-all for unmatched /api routes to ensure they return JSON instead of HTML
+  // Catch-all for unmatched /api routes - ensure this is before Vite middleware
   app.all("/api/*", (req, res) => {
-    res.status(404).json({ error: `Route ${req.method} ${req.url} tidak ditemukan.` });
+    console.log(`[404 API] ${req.method} ${req.url}`);
+    res.status(404).json({ 
+      error: `Endpoint API tidak ditemukan: ${req.method} ${req.url}`,
+      path: req.url,
+      method: req.method
+    });
   });
 
   // Error handler
