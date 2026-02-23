@@ -62,12 +62,27 @@ export default function App() {
         fetch('/api/employees'),
         fetch('/api/employees/stats')
       ]);
+      
+      if (!empRes.ok || !statsRes.ok) {
+        throw new Error('Gagal mengambil data dari server');
+      }
+
       const empData = await empRes.json();
       const statsData = await statsRes.json();
-      setEmployees(empData);
-      setStats(statsData);
+      
+      if (Array.isArray(empData)) {
+        setEmployees(empData);
+      } else {
+        console.error('Data pegawai bukan array:', empData);
+        setEmployees([]);
+      }
+      
+      if (statsData && typeof statsData === 'object') {
+        setStats(statsData);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
+      setError('Gagal memuat data. Silakan refresh halaman.');
     } finally {
       setLoading(false);
     }
@@ -161,12 +176,13 @@ export default function App() {
         setIsModalOpen(false);
         fetchData();
       } else {
-        setError(result.error || 'Terjadi kesalahan saat menyimpan data.');
+        setError(result?.error || 'Terjadi kesalahan saat menyimpan data.');
       }
     } catch (err: any) {
       console.error('Error saving employee:', err);
-      setError(err.message.includes('Server mengembalikan respon non-JSON') 
-        ? err.message 
+      const errMsg = err?.message || '';
+      setError(errMsg.includes('Server mengembalikan respon non-JSON') 
+        ? errMsg 
         : 'Gagal menghubungi server. Pastikan koneksi internet aktif dan server berjalan.');
     } finally {
       setIsSaving(false);
@@ -185,9 +201,14 @@ export default function App() {
   };
 
   const filteredEmployees = employees.filter(emp => {
-    const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         (emp.nip && emp.nip.includes(searchTerm)) ||
-                         emp.position.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!emp) return false;
+    const name = emp.name || '';
+    const nip = emp.nip || '';
+    const position = emp.position || '';
+    
+    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         nip.includes(searchTerm) ||
+                         position.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = filterCategory === 'ALL' || emp.category === filterCategory;
     return matchesSearch && matchesCategory;
   });
@@ -249,9 +270,9 @@ export default function App() {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
-                { label: 'Total Pegawai', value: stats.total, icon: Users, color: 'bg-blue-500' },
-                { label: 'Pegawai ASN', value: stats.asn, icon: CheckCircle2, color: 'bg-emerald-500' },
-                { label: 'P3K Paruh Waktu', value: stats.p3k, icon: AlertCircle, color: 'bg-amber-500' },
+                { label: 'Total Pegawai', value: stats?.total || 0, icon: Users, color: 'bg-blue-500' },
+                { label: 'Pegawai ASN', value: stats?.asn || 0, icon: CheckCircle2, color: 'bg-emerald-500' },
+                { label: 'P3K Paruh Waktu', value: stats?.p3k || 0, icon: AlertCircle, color: 'bg-amber-500' },
               ].map((stat, i) => (
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
@@ -276,8 +297,9 @@ export default function App() {
               <h3 className="text-lg font-bold mb-6">Distribusi Pegawai per Bidang</h3>
               <div className="space-y-4">
                 {['Sekretariat', 'Bidang Ideologi & Wawasan Kebangsaan', 'Bidang Politik Dalam Negeri', 'Bidang Ketahanan Ekonomi, Sosial & Budaya', 'Bidang Kewaspadaan Nasional'].map((division) => {
-                  const count = employees.filter(e => e.division === division).length;
-                  const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                  const count = (employees || []).filter(e => e && e.division === division).length;
+                  const total = stats?.total || 0;
+                  const percentage = total > 0 ? (count / total) * 100 : 0;
                   return (
                     <div key={division}>
                       <div className="flex justify-between text-sm mb-1">
