@@ -1,0 +1,5 @@
+{
+  "name": "Sistem Informasi Kepegawaian Kesbangpol",
+  "description": "Aplikasi manajemen database kepegawaian untuk Badan Kesatuan Bangsa dan Politik Dalam Negeri, mencakup data ASN dan P3K Paruh Waktu.",
+  "requestFramePermissions": []
+}
