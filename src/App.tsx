@@ -140,6 +140,9 @@ export default function App() {
     try {
       const res = await fetch(url, {
         method,
+        headers: {
+          'Accept': 'application/json',
+        },
         body: data
       });
       

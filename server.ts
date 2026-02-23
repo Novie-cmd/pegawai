@@ -9,13 +9,28 @@ import fs from "fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Ensure uploads directory exists
+// Ensure uploads directory exists and is writable
 const uploadDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+  fs.accessSync(uploadDir, fs.constants.W_OK);
+  console.log(`Upload directory is ready and writable: ${uploadDir}`);
+} catch (err) {
+  console.error(`Error with upload directory: ${err.message}`);
 }
 
-const db = new Database("kepegawaian.db");
+const dbPath = path.join(__dirname, "kepegawaian.db");
+console.log(`Initializing database at: ${dbPath}`);
+let db: Database.Database;
+try {
+  db = new Database(dbPath);
+  console.log("Database connection successful");
+} catch (err) {
+  console.error(`Failed to connect to database: ${err.message}`);
+  process.exit(1);
+}
 
 // Initialize database with new fields
 db.exec(`
@@ -94,8 +109,8 @@ async function startServer() {
     next();
   });
 
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
   app.use("/uploads", express.static(uploadDir));
 
   // Health check
@@ -121,12 +136,16 @@ async function startServer() {
     res.json({ total, asn, p3k });
   });
 
-  app.post("/api/employees", upload.fields([
+  app.post("/api/employees", (req, res, next) => {
+    console.log("POST /api/employees hit");
+    next();
+  }, upload.fields([
     { name: 'doc_ktp', maxCount: 1 },
     { name: 'doc_sk_pangkat', maxCount: 1 },
     { name: 'doc_sk_berkala', maxCount: 1 },
     { name: 'doc_sk_jabatan', maxCount: 1 }
   ]), (req, res) => {
+    console.log("POST /api/employees processing body:", req.body);
     const { name, nip, position, category, division, education, religion, phone, email } = req.body;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
     
@@ -206,8 +225,10 @@ async function startServer() {
   // Error handler
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error("Server Error:", err);
+    res.setHeader('Content-Type', 'application/json');
     res.status(err.status || 500).json({
-      error: err.message || "Terjadi kesalahan internal pada server."
+      error: err.message || "Terjadi kesalahan internal pada server.",
+      details: process.env.NODE_ENV !== 'production' ? err.stack : undefined
     });
   });
 
@@ -226,6 +247,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode`);
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
