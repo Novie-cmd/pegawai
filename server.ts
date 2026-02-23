@@ -156,7 +156,7 @@ async function startServer() {
   ]), (req, res) => {
     console.log("POST /api/employees processing body:", req.body);
     const { name, nip, position, category, division, education, religion, phone, email } = req.body;
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const files = req.files;
     
     const doc_ktp = files?.doc_ktp?.[0]?.filename || null;
     const doc_sk_pangkat = files?.doc_sk_pangkat?.[0]?.filename || null;
@@ -188,7 +188,7 @@ async function startServer() {
   ]), (req, res) => {
     const { id } = req.params;
     const { name, nip, position, category, division, education, religion, phone, email } = req.body;
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const files = req.files;
 
     // Handle empty NIP as null
     const finalNip = nip === "" ? null : nip;
