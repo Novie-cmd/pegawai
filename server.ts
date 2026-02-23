@@ -6,6 +6,8 @@ import { fileURLToPath } from "url";
 import multer from "multer";
 import fs from "fs";
 
+console.log("SERVER.TS STARTING UP...");
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -23,7 +25,7 @@ try {
 
 const dbPath = path.join(__dirname, "kepegawaian.db");
 console.log(`Initializing database at: ${dbPath}`);
-let db: Database.Database;
+let db;
 try {
   db = new Database(dbPath);
   console.log("Database connection successful");
@@ -55,7 +57,7 @@ db.exec(`
 
 // Migration: Add missing columns if table already existed
 const columns = db.prepare("PRAGMA table_info(employees)").all();
-const columnNames = columns.map((c: any) => c.name);
+const columnNames = columns.map((c) => c.name);
 
 const expectedColumns = [
   { name: 'education', type: 'TEXT' },
@@ -100,6 +102,7 @@ const upload = multer({
 });
 
 async function startServer() {
+  console.log("Starting startServer function...");
   const app = express();
   const PORT = 3000;
 
@@ -111,6 +114,12 @@ async function startServer() {
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+  // Simple ping for connectivity check
+  app.get("/ping", (req, res) => {
+    res.send("pong");
+  });
+
   app.use("/uploads", express.static(uploadDir));
 
   // Health check
@@ -118,7 +127,7 @@ async function startServer() {
     try {
       db.prepare("SELECT 1").get();
       res.json({ status: "ok", database: "connected" });
-    } catch (err: any) {
+    } catch (err) {
       res.status(500).json({ status: "error", database: err.message });
     }
   });
@@ -162,7 +171,7 @@ async function startServer() {
         "INSERT INTO employees (name, nip, position, category, division, education, religion, phone, email, doc_ktp, doc_sk_pangkat, doc_sk_berkala, doc_sk_jabatan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
       ).run(name, finalNip, position, category, division, education, religion, phone, email, doc_ktp, doc_sk_pangkat, doc_sk_berkala, doc_sk_jabatan);
       res.status(201).json({ id: info.lastInsertRowid });
-    } catch (error: any) {
+    } catch (error) {
       let message = error.message;
       if (message.includes("UNIQUE constraint failed: employees.nip")) {
         message = "NIP sudah terdaftar. Silakan gunakan NIP lain atau kosongkan jika tidak ada.";
@@ -197,7 +206,7 @@ async function startServer() {
         "UPDATE employees SET name = ?, nip = ?, position = ?, category = ?, division = ?, education = ?, religion = ?, phone = ?, email = ?, doc_ktp = ?, doc_sk_pangkat = ?, doc_sk_berkala = ?, doc_sk_jabatan = ? WHERE id = ?"
       ).run(name, finalNip, position, category, division, education, religion, phone, email, doc_ktp, doc_sk_pangkat, doc_sk_berkala, doc_sk_jabatan, id);
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error) {
       let message = error.message;
       if (message.includes("UNIQUE constraint failed: employees.nip")) {
         message = "NIP sudah terdaftar. Silakan gunakan NIP lain.";
@@ -223,8 +232,8 @@ async function startServer() {
   });
 
   // Error handler
-  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error("Server Error:", err);
+  app.use((err, req, res, next) => {
+    console.log("Server Error:", err);
     res.setHeader('Content-Type', 'application/json');
     res.status(err.status || 500).json({
       error: err.message || "Terjadi kesalahan internal pada server.",
@@ -233,22 +242,59 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  const distPath = path.resolve(__dirname, "dist");
+  const isProd = process.env.NODE_ENV === "production" || fs.existsSync(distPath);
+  
+  console.log(`Environment: NODE_ENV=${process.env.NODE_ENV}, isProd=${isProd}`);
+  
+  if (!isProd) {
+    console.log("Starting in DEVELOPMENT mode with Vite middleware");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(__dirname, "dist")));
+    console.log(`Starting in PRODUCTION mode serving static files from: ${distPath}`);
+    app.use(express.static('dist'));
+    app.use(express.static(distPath));
+    
+    app.get("/", (req, res) => {
+      console.log("[Root Route] Serving index.html");
+      const indexPath = path.join(distPath, "index.html");
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send("index.html not found in dist");
+      }
+    });
+
     app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+      console.log(`[SPA Fallback] Request: ${req.method} ${req.url}`);
+      const indexPath = path.join(distPath, "index.html");
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        console.error(`[SPA Fallback] ERROR: index.html not found at ${indexPath}`);
+        res.status(404).send("Production build not found. Please run 'npm run build'.");
+      }
     });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode`);
+    console.log(`Current directory: ${process.cwd()}`);
+    console.log(`__dirname: ${__dirname}`);
     console.log(`Server running on http://localhost:${PORT}`);
+    
+    if (process.env.NODE_ENV === "production") {
+      const distPath = path.join(__dirname, "dist");
+      if (fs.existsSync(distPath)) {
+        console.log(`Serving static files from: ${distPath}`);
+      } else {
+        console.error(`ERROR: dist directory not found at ${distPath}`);
+      }
+    }
   });
 }
 
