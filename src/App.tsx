@@ -31,6 +31,8 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<'ALL' | 'ASN' | 'P3K'>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'employees'>('dashboard');
 
@@ -76,6 +78,7 @@ export default function App() {
   }, []);
 
   const handleOpenModal = (employee?: Employee) => {
+    setError(null);
     if (employee) {
       setEditingEmployee(employee);
       setFormData({
@@ -114,11 +117,22 @@ export default function App() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
+    setError(null);
+    
     const url = editingEmployee ? `/api/employees/${editingEmployee.id}` : '/api/employees';
     const method = editingEmployee ? 'PUT' : 'POST';
 
     const data = new FormData();
-    Object.entries(formData).forEach(([key, value]) => data.append(key, value as string));
+    Object.entries(formData).forEach(([key, value]) => {
+      // Convert empty NIP to null-like behavior for the backend
+      if (key === 'nip' && !value) {
+        data.append(key, '');
+      } else {
+        data.append(key, value as string);
+      }
+    });
+    
     Object.entries(files).forEach(([key, file]) => {
       if (file) data.append(key, file as Blob);
     });
@@ -128,12 +142,20 @@ export default function App() {
         method,
         body: data
       });
+      
+      const result = await res.json();
+      
       if (res.ok) {
         setIsModalOpen(false);
         fetchData();
+      } else {
+        setError(result.error || 'Terjadi kesalahan saat menyimpan data.');
       }
-    } catch (error) {
-      console.error('Error saving employee:', error);
+    } catch (err) {
+      console.error('Error saving employee:', err);
+      setError('Gagal menghubungi server. Silakan coba lagi.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -380,9 +402,9 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden"
+              className="relative w-full max-w-2xl max-h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col"
             >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white z-10">
                 <h3 className="text-xl font-bold text-slate-800">
                   {editingEmployee ? 'Edit Data Pegawai' : 'Tambah Pegawai Baru'}
                 </h3>
@@ -394,172 +416,189 @@ export default function App() {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nama Lengkap</label>
-                    <input 
-                      required
-                      type="text" 
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    />
+              <form onSubmit={handleSubmit} className="flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {error && (
+                    <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm flex items-center gap-2">
+                      <AlertCircle size={18} />
+                      {error}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nama Lengkap</label>
+                      <input 
+                        required
+                        type="text" 
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">NIP (Opsional)</label>
+                      <input 
+                        type="text" 
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={formData.nip}
+                        onChange={(e) => setFormData({...formData, nip: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pendidikan Terakhir</label>
+                      <select 
+                        required
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={formData.education}
+                        onChange={(e) => setFormData({...formData, education: e.target.value})}
+                      >
+                        <option value="">Pilih Pendidikan</option>
+                        {EDUCATIONS.map(edu => <option key={edu} value={edu}>{edu}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Agama</label>
+                      <select 
+                        required
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={formData.religion}
+                        onChange={(e) => setFormData({...formData, religion: e.target.value})}
+                      >
+                        <option value="">Pilih Agama</option>
+                        {RELIGIONS.map(rel => <option key={rel} value={rel}>{rel}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Jabatan</label>
+                      <input 
+                        required
+                        type="text" 
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={formData.position}
+                        onChange={(e) => setFormData({...formData, position: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kategori</label>
+                      <select 
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={formData.category}
+                        onChange={(e) => setFormData({...formData, category: e.target.value as any})}
+                      >
+                        <option value="ASN">ASN</option>
+                        <option value="P3K">P3K Paruh Waktu</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bidang / Unit Kerja</label>
+                      <select 
+                        required
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={formData.division}
+                        onChange={(e) => setFormData({...formData, division: e.target.value})}
+                      >
+                        <option value="">Pilih Bidang</option>
+                        <option value="Sekretariat">Sekretariat</option>
+                        <option value="Bidang Ideologi & Wawasan Kebangsaan">Bidang Ideologi & Wawasan Kebangsaan</option>
+                        <option value="Bidang Politik Dalam Negeri">Bidang Politik Dalam Negeri</option>
+                        <option value="Bidang Ketahanan Ekonomi, Sosial & Budaya">Bidang Ketahanan Ekonomi, Sosial & Budaya</option>
+                        <option value="Bidang Kewaspadaan Nasional">Bidang Kewaspadaan Nasional</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">No. Telepon</label>
+                      <input 
+                        type="tel" 
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email</label>
+                      <input 
+                        type="email" 
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">NIP (Opsional)</label>
-                    <input 
-                      type="text" 
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                      value={formData.nip}
-                      onChange={(e) => setFormData({...formData, nip: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pendidikan Terakhir</label>
-                    <select 
-                      required
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                      value={formData.education}
-                      onChange={(e) => setFormData({...formData, education: e.target.value})}
-                    >
-                      <option value="">Pilih Pendidikan</option>
-                      {EDUCATIONS.map(edu => <option key={edu} value={edu}>{edu}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Agama</label>
-                    <select 
-                      required
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                      value={formData.religion}
-                      onChange={(e) => setFormData({...formData, religion: e.target.value})}
-                    >
-                      <option value="">Pilih Agama</option>
-                      {RELIGIONS.map(rel => <option key={rel} value={rel}>{rel}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Jabatan</label>
-                    <input 
-                      required
-                      type="text" 
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                      value={formData.position}
-                      onChange={(e) => setFormData({...formData, position: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Kategori</label>
-                    <select 
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                      value={formData.category}
-                      onChange={(e) => setFormData({...formData, category: e.target.value as any})}
-                    >
-                      <option value="ASN">ASN</option>
-                      <option value="P3K">P3K Paruh Waktu</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Bidang / Unit Kerja</label>
-                    <select 
-                      required
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                      value={formData.division}
-                      onChange={(e) => setFormData({...formData, division: e.target.value})}
-                    >
-                      <option value="">Pilih Bidang</option>
-                      <option value="Sekretariat">Sekretariat</option>
-                      <option value="Bidang Ideologi & Wawasan Kebangsaan">Bidang Ideologi & Wawasan Kebangsaan</option>
-                      <option value="Bidang Politik Dalam Negeri">Bidang Politik Dalam Negeri</option>
-                      <option value="Bidang Ketahanan Ekonomi, Sosial & Budaya">Bidang Ketahanan Ekonomi, Sosial & Budaya</option>
-                      <option value="Bidang Kewaspadaan Nasional">Bidang Kewaspadaan Nasional</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">No. Telepon</label>
-                    <input 
-                      type="tel" 
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email</label>
-                    <input 
-                      type="email" 
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    />
-                  </div>
-                </div>
 
-                {/* Document Upload Section */}
-                <div className="space-y-4 pt-4 border-t border-slate-100">
-                  <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                    <Upload size={16} />
-                    Upload Dokumen (PDF)
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { id: 'doc_ktp', label: 'KTP' },
-                      { id: 'doc_sk_pangkat', label: 'SK Pangkat Terakhir' },
-                      { id: 'doc_sk_berkala', label: 'SK Berkala Terakhir' },
-                      { id: 'doc_sk_jabatan', label: 'SK Jabatan' },
-                    ].map((doc) => (
-                      <div key={doc.id} className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{doc.label}</label>
-                        <div className="relative">
-                          <input 
-                            type="file" 
-                            accept=".pdf"
-                            className="hidden"
-                            id={doc.id}
-                            onChange={(e) => setFiles({...files, [doc.id]: e.target.files?.[0] || null})}
-                          />
-                          <label 
-                            htmlFor={doc.id}
-                            className={`flex items-center justify-between px-4 py-2 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
-                              files[doc.id] ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300 bg-slate-50'
-                            }`}
-                          >
-                            <span className="text-xs text-slate-600 truncate max-w-[150px]">
-                              {files[doc.id] ? files[doc.id]?.name : 'Pilih File...'}
-                            </span>
-                            <FileText size={14} className={files[doc.id] ? 'text-indigo-500' : 'text-slate-400'} />
-                          </label>
-                          {editingEmployee && (editingEmployee as any)[doc.id] && (
-                            <a 
-                              href={`/uploads/${(editingEmployee as any)[doc.id]}`} 
-                              target="_blank" 
-                              rel="noreferrer"
-                              className="absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full shadow-sm hover:bg-emerald-600 transition-all"
-                              title="Lihat Dokumen Saat Ini"
+                  {/* Document Upload Section */}
+                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                    <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <Upload size={16} />
+                      Upload Dokumen (PDF)
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[
+                        { id: 'doc_ktp', label: 'KTP' },
+                        { id: 'doc_sk_pangkat', label: 'SK Pangkat Terakhir' },
+                        { id: 'doc_sk_berkala', label: 'SK Berkala Terakhir' },
+                        { id: 'doc_sk_jabatan', label: 'SK Jabatan' },
+                      ].map((doc) => (
+                        <div key={doc.id} className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{doc.label}</label>
+                          <div className="relative">
+                            <input 
+                              type="file" 
+                              accept=".pdf"
+                              className="hidden"
+                              id={doc.id}
+                              onChange={(e) => setFiles({...files, [doc.id]: e.target.files?.[0] || null})}
+                            />
+                            <label 
+                              htmlFor={doc.id}
+                              className={`flex items-center justify-between px-4 py-2 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
+                                files[doc.id] ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300 bg-slate-50'
+                              }`}
                             >
-                              <Download size={10} />
-                            </a>
-                          )}
+                              <span className="text-xs text-slate-600 truncate max-w-[150px]">
+                                {files[doc.id] ? files[doc.id]?.name : 'Pilih File...'}
+                              </span>
+                              <FileText size={14} className={files[doc.id] ? 'text-indigo-500' : 'text-slate-400'} />
+                            </label>
+                            {editingEmployee && (editingEmployee as any)[doc.id] && (
+                              <a 
+                                href={`/uploads/${(editingEmployee as any)[doc.id]}`} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full shadow-sm hover:bg-emerald-600 transition-all"
+                                title="Lihat Dokumen Saat Ini"
+                              >
+                                <Download size={10} />
+                              </a>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-4">
+                <div className="p-6 border-t border-slate-100 flex gap-3 bg-slate-50 shrink-0">
                   <button 
                     type="button"
+                    disabled={isSaving}
                     onClick={() => setIsModalOpen(false)}
-                    className="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-all"
+                    className="flex-1 px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-xl transition-all disabled:opacity-50"
                   >
                     Batal
                   </button>
                   <button 
                     type="submit"
-                    className="flex-1 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-200"
+                    disabled={isSaving}
+                    className="flex-1 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {editingEmployee ? 'Simpan Perubahan' : 'Tambah Pegawai'}
+                    {isSaving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Menyimpan...
+                      </>
+                    ) : (
+                      editingEmployee ? 'Simpan Perubahan' : 'Tambah Pegawai'
+                    )}
                   </button>
                 </div>
               </form>

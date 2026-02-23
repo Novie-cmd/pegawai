@@ -94,10 +94,13 @@ async function startServer() {
     const doc_sk_berkala = files?.doc_sk_berkala?.[0]?.filename || null;
     const doc_sk_jabatan = files?.doc_sk_jabatan?.[0]?.filename || null;
 
+    // Handle empty NIP as null
+    const finalNip = nip === "" ? null : nip;
+
     try {
       const info = db.prepare(
         "INSERT INTO employees (name, nip, position, category, division, education, religion, phone, email, doc_ktp, doc_sk_pangkat, doc_sk_berkala, doc_sk_jabatan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-      ).run(name, nip, position, category, division, education, religion, phone, email, doc_ktp, doc_sk_pangkat, doc_sk_berkala, doc_sk_jabatan);
+      ).run(name, finalNip, position, category, division, education, religion, phone, email, doc_ktp, doc_sk_pangkat, doc_sk_berkala, doc_sk_jabatan);
       res.status(201).json({ id: info.lastInsertRowid });
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -114,6 +117,9 @@ async function startServer() {
     const { name, nip, position, category, division, education, religion, phone, email } = req.body;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
+    // Handle empty NIP as null
+    const finalNip = nip === "" ? null : nip;
+
     try {
       // Get existing employee to keep old files if new ones aren't uploaded
       const existing = db.prepare("SELECT * FROM employees WHERE id = ?").get();
@@ -125,7 +131,7 @@ async function startServer() {
 
       db.prepare(
         "UPDATE employees SET name = ?, nip = ?, position = ?, category = ?, division = ?, education = ?, religion = ?, phone = ?, email = ?, doc_ktp = ?, doc_sk_pangkat = ?, doc_sk_berkala = ?, doc_sk_jabatan = ? WHERE id = ?"
-      ).run(name, nip, position, category, division, education, religion, phone, email, doc_ktp, doc_sk_pangkat, doc_sk_berkala, doc_sk_jabatan, id);
+      ).run(name, finalNip, position, category, division, education, religion, phone, email, doc_ktp, doc_sk_pangkat, doc_sk_berkala, doc_sk_jabatan, id);
       res.json({ success: true });
     } catch (error) {
       res.status(400).json({ error: error.message });
