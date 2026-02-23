@@ -143,7 +143,16 @@ export default function App() {
         body: data
       });
       
-      const result = await res.json();
+      const contentType = res.headers.get("content-type");
+      let result;
+      
+      if (contentType && contentType.includes("application/json")) {
+        result = await res.json();
+      } else {
+        const text = await res.text();
+        console.error('Non-JSON response:', text);
+        throw new Error(`Server mengembalikan respon non-JSON (Status: ${res.status}). Silakan cek konsol untuk detail.`);
+      }
       
       if (res.ok) {
         setIsModalOpen(false);
@@ -151,9 +160,11 @@ export default function App() {
       } else {
         setError(result.error || 'Terjadi kesalahan saat menyimpan data.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving employee:', err);
-      setError('Gagal menghubungi server. Silakan coba lagi.');
+      setError(err.message.includes('Server mengembalikan respon non-JSON') 
+        ? err.message 
+        : 'Gagal menghubungi server. Pastikan koneksi internet aktif dan server berjalan.');
     } finally {
       setIsSaving(false);
     }

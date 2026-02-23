@@ -38,6 +38,30 @@ db.exec(`
   )
 `);
 
+// Migration: Add missing columns if table already existed
+const columns = db.prepare("PRAGMA table_info(employees)").all();
+const columnNames = columns.map((c: any) => c.name);
+
+const expectedColumns = [
+  { name: 'education', type: 'TEXT' },
+  { name: 'religion', type: 'TEXT' },
+  { name: 'doc_ktp', type: 'TEXT' },
+  { name: 'doc_sk_pangkat', type: 'TEXT' },
+  { name: 'doc_sk_berkala', type: 'TEXT' },
+  { name: 'doc_sk_jabatan', type: 'TEXT' }
+];
+
+expectedColumns.forEach(col => {
+  if (!columnNames.includes(col.name)) {
+    try {
+      db.exec(`ALTER TABLE employees ADD COLUMN ${col.name} ${col.type}`);
+      console.log(`Added missing column: ${col.name}`);
+    } catch (e) {
+      console.error(`Error adding column ${col.name}:`, e);
+    }
+  }
+});
+
 // Multer configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -66,6 +90,16 @@ async function startServer() {
 
   app.use(express.json());
   app.use("/uploads", express.static(uploadDir));
+
+  // Health check
+  app.get("/api/health", (req, res) => {
+    try {
+      db.prepare("SELECT 1").get();
+      res.json({ status: "ok", database: "connected" });
+    } catch (err: any) {
+      res.status(500).json({ status: "error", database: err.message });
+    }
+  });
 
   // API Routes
   app.get("/api/employees", (req, res) => {
@@ -142,6 +176,19 @@ async function startServer() {
     const { id } = req.params;
     db.prepare("DELETE FROM employees WHERE id = ?").run(id);
     res.json({ success: true });
+  });
+
+  // Catch-all for unmatched /api routes to ensure they return JSON instead of HTML
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ error: `Route ${req.method} ${req.url} tidak ditemukan.` });
+  });
+
+  // Error handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Server Error:", err);
+    res.status(err.status || 500).json({
+      error: err.message || "Terjadi kesalahan internal pada server."
+    });
   });
 
   // Vite middleware for development
