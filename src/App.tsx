@@ -301,7 +301,7 @@ export default function App() {
             <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
               <h3 className="text-lg font-bold mb-6">Distribusi Pegawai per Bidang</h3>
               <div className="space-y-4">
-                {['Sekretariat', 'Bidang Ideologi & Wawasan Kebangsaan', 'Bidang Politik Dalam Negeri', 'Bidang Ketahanan Ekonomi, Sosial & Budaya', 'Bidang Kewaspadaan Nasional'].map((division) => {
+                {['Sekretariat', 'Bidang Ideologi & Wawasan Kebangsaan', 'Bidang Politik Dalam Negeri', 'Bidang Kewaspadaan Nasional'].map((division) => {
                   const count = (employees || []).filter(e => e && e.division === division).length;
                   const total = stats?.total || 0;
                   const percentage = total > 0 ? (count / total) * 100 : 0;
@@ -542,7 +542,6 @@ export default function App() {
                         <option value="Sekretariat">Sekretariat</option>
                         <option value="Bidang Ideologi & Wawasan Kebangsaan">Bidang Ideologi & Wawasan Kebangsaan</option>
                         <option value="Bidang Politik Dalam Negeri">Bidang Politik Dalam Negeri</option>
-                        <option value="Bidang Ketahanan Ekonomi, Sosial & Budaya">Bidang Ketahanan Ekonomi, Sosial & Budaya</option>
                         <option value="Bidang Kewaspadaan Nasional">Bidang Kewaspadaan Nasional</option>
                       </select>
                     </div>
@@ -577,7 +576,7 @@ export default function App() {
                         { id: 'doc_ktp', label: 'KTP' },
                         { id: 'doc_sk_pangkat', label: 'SK Pangkat Terakhir' },
                         { id: 'doc_sk_berkala', label: 'SK Berkala Terakhir' },
-                        { id: 'doc_sk_jabatan', label: 'SK Jabatan' },
+                        { id: 'doc_sk_jabatan', label: 'SK Jabatan (Opsional)' },
                       ].map((doc) => (
                         <div key={doc.id} className="space-y-1">
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{doc.label}</label>
