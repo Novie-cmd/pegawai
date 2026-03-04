@@ -295,7 +295,7 @@ async function startServer() {
         path: req.url
       });
     } else {
-      res.status(404).send("The page could not be found (404)");
+      res.status(404).send("The page could not be found (Error: SERVER-APP-404)");
     }
   });
 
