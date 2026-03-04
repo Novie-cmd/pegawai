@@ -138,6 +138,8 @@ export default function App() {
     
     const url = editingEmployee ? `/api/employees/${editingEmployee.id}` : '/api/employees';
     const method = editingEmployee ? 'PUT' : 'POST';
+    
+    console.log(`Attempting to save employee. URL: ${url}, Method: ${method}`);
 
     const data = new FormData();
     Object.entries(formData).forEach(([key, value]) => {
@@ -295,6 +297,31 @@ export default function App() {
                   <p className="text-3xl font-bold text-slate-800 mt-1">{String(stat.value)}</p>
                 </motion.div>
               ))}
+            </div>
+
+            {/* Connectivity Test */}
+            <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="text-amber-600" size={20} />
+                <div>
+                  <p className="text-sm font-bold text-amber-800">Tes Koneksi Server</p>
+                  <p className="text-xs text-amber-700">Gunakan ini jika Anda mengalami error "Page not found" saat menyimpan.</p>
+                </div>
+              </div>
+              <button 
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/ping');
+                    const text = await res.text();
+                    alert(text === 'pong' ? 'Koneksi Berhasil: Server merespon dengan benar.' : `Koneksi Bermasalah: ${text}`);
+                  } catch (e: any) {
+                    alert(`Koneksi Gagal: ${e.message}`);
+                  }
+                }}
+                className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all"
+              >
+                Cek Sekarang
+              </button>
             </div>
 
             {/* Recent Activity or Chart Placeholder */}

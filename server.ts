@@ -180,13 +180,17 @@ async function startServer() {
     }
   });
 
-  app.put("/api/employees/:id", upload.fields([
+  app.put("/api/employees/:id", (req, res, next) => {
+    console.log(`PUT /api/employees/${req.params.id} hit`);
+    next();
+  }, upload.fields([
     { name: 'doc_ktp', maxCount: 1 },
     { name: 'doc_sk_pangkat', maxCount: 1 },
     { name: 'doc_sk_berkala', maxCount: 1 },
     { name: 'doc_sk_jabatan', maxCount: 1 }
   ]), (req, res) => {
     const { id } = req.params;
+    console.log(`Processing PUT for employee ID: ${id}`);
     const { name, nip, position, category, division, education, religion, phone, email } = req.body;
     const files = (req as any).files;
 
@@ -276,10 +280,24 @@ async function startServer() {
         res.sendFile(indexPath);
       } else {
         console.error(`[SPA Fallback] ERROR: index.html not found at ${indexPath}`);
-        res.status(404).send("Production build not found. Please run 'npm run build'.");
+        res.status(404).send("Halaman tidak ditemukan. Pastikan build produksi sudah tersedia.");
       }
     });
   }
+
+  // Final catch-all for any unmatched request (any method)
+  app.use((req, res) => {
+    console.log(`[404 Global Catch-all] ${req.method} ${req.url}`);
+    if (req.url.startsWith('/api/')) {
+      res.status(404).json({ 
+        error: "Endpoint API tidak ditemukan",
+        method: req.method,
+        path: req.url
+      });
+    } else {
+      res.status(404).send("The page could not be found (404)");
+    }
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode`);
