@@ -106,6 +106,12 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // PRIORITY 1: Connectivity check (MUST be first)
+  app.get("/ping", (req, res) => {
+    console.log("[PING] Connectivity test received");
+    res.send("pong");
+  });
+
   // Request logging middleware
   app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
@@ -114,11 +120,6 @@ async function startServer() {
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
-  // Simple ping for connectivity check
-  app.get("/ping", (req, res) => {
-    res.send("pong");
-  });
 
   app.use("/uploads", express.static(uploadDir));
 

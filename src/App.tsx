@@ -311,11 +311,16 @@ export default function App() {
               <button 
                 onClick={async () => {
                   try {
+                    const currentUrl = window.location.href;
                     const res = await fetch('/ping');
                     const text = await res.text();
-                    alert(text === 'pong' ? 'Koneksi Berhasil: Server merespon dengan benar.' : `Koneksi Bermasalah: ${text}`);
+                    if (text === 'pong') {
+                      alert(`Koneksi Berhasil!\nURL: ${currentUrl}\nServer merespon dengan benar.`);
+                    } else {
+                      alert(`Koneksi Bermasalah!\nURL: ${currentUrl}\nRespon: ${text}`);
+                    }
                   } catch (e: any) {
-                    alert(`Koneksi Gagal: ${e.message}`);
+                    alert(`Koneksi Gagal!\nURL: ${window.location.href}\nError: ${e.message}`);
                   }
                 }}
                 className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all"
