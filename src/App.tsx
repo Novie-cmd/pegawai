@@ -16,7 +16,9 @@ import {
   AlertCircle,
   FileText,
   Download,
-  Upload
+  Upload,
+  Printer,
+  FileBarChart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Employee, Stats } from './types';
@@ -30,11 +32,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<'ALL' | 'ASN' | 'P3K'>('ALL');
+  const [filterDivision, setFilterDivision] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'employees'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'reports'>('dashboard');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -217,13 +222,14 @@ export default function App() {
                          nip.includes(searchTerm) ||
                          position.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = filterCategory === 'ALL' || emp.category === filterCategory;
-    return matchesSearch && matchesCategory;
+    const matchesDivision = filterDivision === 'ALL' || emp.division === filterDivision;
+    return matchesSearch && matchesCategory && matchesDivision;
   });
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] text-slate-900 font-sans">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-200 z-20 hidden md:block">
+      <aside className="fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-200 z-20 hidden md:block print:hidden">
         <div className="p-6 border-bottom border-slate-100">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
@@ -250,26 +256,43 @@ export default function App() {
               <Users size={20} />
               <span>Data Pegawai</span>
             </button>
+            <button 
+              onClick={() => setActiveTab('reports')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'reports' ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+              <FileBarChart size={20} />
+              <span>Laporan</span>
+            </button>
           </nav>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="md:ml-64 p-4 md:p-8">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <main className="md:ml-64 p-4 md:p-8 print:ml-0 print:p-0">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 print:hidden">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">
-              {activeTab === 'dashboard' ? 'Ringkasan Statistik' : 'Manajemen Pegawai'}
+              {activeTab === 'dashboard' ? 'Ringkasan Statistik' : activeTab === 'employees' ? 'Manajemen Pegawai' : 'Laporan Detail Pegawai'}
             </h2>
             <p className="text-slate-500 text-sm">Badan Kesatuan Bangsa dan Politik Dalam Negeri</p>
           </div>
-          <button 
-            onClick={() => handleOpenModal()}
-            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl transition-all shadow-sm shadow-indigo-200"
-          >
-            <UserPlus size={18} />
-            <span>Tambah Pegawai</span>
-          </button>
+          {activeTab !== 'reports' ? (
+            <button 
+              onClick={() => handleOpenModal()}
+              className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl transition-all shadow-sm shadow-indigo-200"
+            >
+              <UserPlus size={18} />
+              <span>Tambah Pegawai</span>
+            </button>
+          ) : (
+            <button 
+              onClick={() => window.print()}
+              className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl transition-all shadow-sm shadow-slate-200 print:hidden"
+            >
+              <Printer size={18} />
+              <span>Cetak Laporan</span>
+            </button>
+          )}
         </header>
 
         {activeTab === 'dashboard' ? (
@@ -356,7 +379,7 @@ export default function App() {
               </div>
             </div>
           </div>
-        ) : (
+        ) : activeTab === 'employees' ? (
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             {/* Filters */}
             <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -455,6 +478,117 @@ export default function App() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-6 print:p-0 print:border-none print:shadow-none">
+            {/* Print Header */}
+            <div className="hidden print:block mb-8 text-center border-b-2 border-slate-800 pb-4">
+              <h1 className="text-xl font-bold uppercase">Laporan Data Pegawai</h1>
+              <p className="text-sm">Badan Kesatuan Bangsa dan Politik Dalam Negeri</p>
+              <p className="text-[10px] mt-1 italic">Dicetak pada: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            </div>
+
+            <div className="mb-6 flex flex-wrap items-center gap-4 print:hidden">
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Cari di laporan..."
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <select 
+                className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value as any)}
+              >
+                <option value="ALL">Semua Kategori</option>
+                <option value="ASN">ASN</option>
+                <option value="P3K">P3K Paruh Waktu</option>
+              </select>
+              <select 
+                className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                value={filterDivision}
+                onChange={(e) => setFilterDivision(e.target.value)}
+              >
+                <option value="ALL">Semua Bidang</option>
+                <option value="Sekretariat">Sekretariat</option>
+                <option value="Bidang Ideologi & Wawasan Kebangsaan">Bidang Ideologi & Wawasan Kebangsaan</option>
+                <option value="Bidang Politik Dalam Negeri">Bidang Politik Dalam Negeri</option>
+                <option value="Bidang Kewaspadaan Nasional">Bidang Kewaspadaan Nasional</option>
+              </select>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px] text-left border-collapse border border-slate-200">
+                <thead className="bg-slate-100">
+                  <tr>
+                    <th className="border border-slate-200 px-2 py-2 text-center">No</th>
+                    <th className="border border-slate-200 px-2 py-2">Nama Lengkap</th>
+                    <th className="border border-slate-200 px-2 py-2">NIP</th>
+                    <th className="border border-slate-200 px-2 py-2">Jabatan</th>
+                    <th className="border border-slate-200 px-2 py-2">Bidang</th>
+                    <th className="border border-slate-200 px-2 py-2">Kategori</th>
+                    <th className="border border-slate-200 px-2 py-2">Pendidikan</th>
+                    <th className="border border-slate-200 px-2 py-2">Agama</th>
+                    <th className="border border-slate-200 px-2 py-2">Kontak</th>
+                    <th className="border border-slate-200 px-2 py-2 text-center">Dokumen</th>
+                    <th className="border border-slate-200 px-2 py-2 text-center print:hidden">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEmployees.map((emp, index) => (
+                    <tr key={emp.id} className="hover:bg-slate-50">
+                      <td className="border border-slate-200 px-2 py-2 text-center">{index + 1}</td>
+                      <td className="border border-slate-200 px-2 py-2 font-semibold">{emp.name}</td>
+                      <td className="border border-slate-200 px-2 py-2">{emp.nip || '-'}</td>
+                      <td className="border border-slate-200 px-2 py-2">{emp.position}</td>
+                      <td className="border border-slate-200 px-2 py-2">{emp.division}</td>
+                      <td className="border border-slate-200 px-2 py-2">{emp.category === 'ASN' ? 'ASN' : 'P3K'}</td>
+                      <td className="border border-slate-200 px-2 py-2">{emp.education || '-'}</td>
+                      <td className="border border-slate-200 px-2 py-2">{emp.religion || '-'}</td>
+                      <td className="border border-slate-200 px-2 py-2">
+                        <div className="text-[9px]">
+                          {emp.phone && <div>{emp.phone}</div>}
+                          {emp.email && <div className="truncate max-w-[100px]">{emp.email}</div>}
+                        </div>
+                      </td>
+                      <td className="border border-slate-200 px-2 py-2 text-center">
+                        <div className="flex justify-center gap-1">
+                          <div className={`w-2 h-2 rounded-full ${emp.doc_ktp ? 'bg-emerald-500' : 'bg-slate-200'}`} title="KTP" />
+                          <div className={`w-2 h-2 rounded-full ${emp.doc_sk_pangkat ? 'bg-emerald-500' : 'bg-slate-200'}`} title="SK Pangkat" />
+                          <div className={`w-2 h-2 rounded-full ${emp.doc_sk_berkala ? 'bg-emerald-500' : 'bg-slate-200'}`} title="SK Berkala" />
+                          <div className={`w-2 h-2 rounded-full ${emp.doc_sk_jabatan ? 'bg-emerald-500' : 'bg-slate-200'}`} title="SK Jabatan" />
+                        </div>
+                      </td>
+                      <td className="border border-slate-200 px-2 py-2 text-center print:hidden">
+                        <button 
+                          onClick={() => {
+                            setSelectedEmployee(emp);
+                            setIsDetailModalOpen(true);
+                          }}
+                          className="text-indigo-600 hover:text-indigo-800 font-medium"
+                        >
+                          Detail
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="mt-8 hidden print:block">
+              <div className="flex justify-end">
+                <div className="text-center w-64">
+                  <p className="mb-16">Kepala Badan Kesbangpol,</p>
+                  <p className="font-bold underline">( ............................................ )</p>
+                  <p>NIP. ............................................</p>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -674,6 +808,137 @@ export default function App() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Detail Modal */}
+      <AnimatePresence>
+        {isDetailModalOpen && selectedEmployee && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDetailModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
+                <h3 className="text-xl font-bold text-slate-800">Detail Pegawai</h3>
+                <button 
+                  onClick={() => setIsDetailModalOpen(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-8 overflow-y-auto max-h-[70vh] space-y-8">
+                <div className="flex items-start gap-6">
+                  <div className="w-24 h-24 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 shrink-0">
+                    <Users size={48} />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-2xl font-bold text-slate-800">{selectedEmployee.name}</h4>
+                    <p className="text-slate-500 font-medium">{selectedEmployee.position}</p>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-2 ${
+                      selectedEmployee.category === 'ASN' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {selectedEmployee.category === 'ASN' ? 'ASN' : 'P3K Paruh Waktu'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <h5 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Informasi Dasar</h5>
+                    <div className="space-y-3">
+                      <div className="flex justify-between border-b border-slate-50 pb-2">
+                        <span className="text-sm text-slate-500">NIP</span>
+                        <span className="text-sm font-semibold text-slate-800">{selectedEmployee.nip || '-'}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-50 pb-2">
+                        <span className="text-sm text-slate-500">Bidang</span>
+                        <span className="text-sm font-semibold text-slate-800">{selectedEmployee.division}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-50 pb-2">
+                        <span className="text-sm text-slate-500">Pendidikan</span>
+                        <span className="text-sm font-semibold text-slate-800">{selectedEmployee.education || '-'}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-50 pb-2">
+                        <span className="text-sm text-slate-500">Agama</span>
+                        <span className="text-sm font-semibold text-slate-800">{selectedEmployee.religion || '-'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h5 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Kontak</h5>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 text-sm text-slate-600">
+                        <Phone size={16} className="text-slate-400" />
+                        <span>{selectedEmployee.phone || '-'}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-slate-600">
+                        <Mail size={16} className="text-slate-400" />
+                        <span className="truncate">{selectedEmployee.email || '-'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h5 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Dokumen Terlampir</h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[
+                      { id: 'doc_ktp', label: 'KTP' },
+                      { id: 'doc_sk_pangkat', label: 'SK Pangkat' },
+                      { id: 'doc_sk_berkala', label: 'SK Berkala' },
+                      { id: 'doc_sk_jabatan', label: 'SK Jabatan' },
+                    ].map((doc) => {
+                      const fileName = (selectedEmployee as any)[doc.id];
+                      return (
+                        <div key={doc.id} className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${
+                          fileName ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100 opacity-60'
+                        }`}>
+                          <div className="flex items-center gap-3">
+                            <FileText size={20} className={fileName ? 'text-emerald-600' : 'text-slate-400'} />
+                            <span className={`text-sm font-medium ${fileName ? 'text-emerald-900' : 'text-slate-500'}`}>{doc.label}</span>
+                          </div>
+                          {fileName ? (
+                            <a 
+                              href={`/uploads/${fileName}`} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="p-2 bg-white text-emerald-600 rounded-xl shadow-sm hover:bg-emerald-100 transition-all"
+                            >
+                              <Download size={16} />
+                            </a>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-bold uppercase">Belum Ada</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-slate-100 bg-slate-50">
+                <button 
+                  onClick={() => setIsDetailModalOpen(false)}
+                  className="w-full py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl transition-all"
+                >
+                  Tutup
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
