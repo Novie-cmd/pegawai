@@ -1,0 +1,32 @@
+{
+  "entities": {
+    "Employee": {
+      "title": "Employee",
+      "description": "Employee data model",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name" },
+        "nip": { "type": "string", "description": "Employee Identification Number" },
+        "position": { "type": "string", "description": "Job position" },
+        "category": { "type": "string", "enum": ["ASN", "P3K"], "description": "Employment category" },
+        "division": { "type": "string", "description": "Division or unit" },
+        "education": { "type": "string", "description": "Last education" },
+        "religion": { "type": "string", "description": "Religion" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "email": { "type": "string", "format": "email", "description": "Email address" },
+        "doc_ktp": { "type": "string", "description": "KTP document URL" },
+        "doc_sk_pangkat": { "type": "string", "description": "SK Pangkat document URL" },
+        "doc_sk_berkala": { "type": "string", "description": "SK Berkala document URL" },
+        "doc_sk_jabatan": { "type": "string", "description": "SK Jabatan document URL" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["name", "position", "category", "division"]
+    }
+  },
+  "firestore": {
+    "/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Collection of employees"
+    }
+  }
+}

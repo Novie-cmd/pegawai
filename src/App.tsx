@@ -18,15 +18,42 @@ import {
   Download,
   Upload,
   Printer,
-  FileBarChart
+  FileBarChart,
+  LogOut,
+  LogIn
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Employee, Stats } from './types';
+import { 
+  auth, 
+  db, 
+  loginWithGoogle, 
+  logout, 
+  uploadFile, 
+  handleFirestoreError, 
+  OperationType,
+  testConnection
+} from './lib/firebase';
+import { 
+  collection, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  Timestamp,
+  serverTimestamp
+} from 'firebase/firestore';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 const RELIGIONS = ['Islam', 'Kristen Protestan', 'Katolik', 'Hindu', 'Buddha', 'Khonghucu'];
 const EDUCATIONS = ['SD', 'SMP', 'SMA/SMK', 'D3', 'D4/S1', 'S2', 'S3'];
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, asn: 0, p3k: 0 });
   const [loading, setLoading] = useState(true);
@@ -40,6 +67,57 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'reports'>('dashboard');
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setIsAuthReady(true);
+      if (currentUser) {
+        testConnection();
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setEmployees([]);
+      setStats({ total: 0, asn: 0, p3k: 0 });
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const q = query(collection(db, 'employees'), orderBy('created_at', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const empData: Employee[] = [];
+      let asnCount = 0;
+      let p3kCount = 0;
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const employee = { 
+          id: doc.id, 
+          ...data,
+          created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString()
+        } as unknown as Employee;
+        
+        empData.push(employee);
+        if (employee.category === 'ASN') asnCount++;
+        if (employee.category === 'P3K') p3kCount++;
+      });
+
+      setEmployees(empData);
+      setStats({ total: empData.length, asn: asnCount, p3k: p3kCount });
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'employees');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -60,43 +138,6 @@ export default function App() {
     doc_sk_berkala: null,
     doc_sk_jabatan: null
   });
-
-  const fetchData = async () => {
-    try {
-      const [empRes, statsRes] = await Promise.all([
-        fetch('/api/employees'),
-        fetch('/api/employees/stats')
-      ]);
-      
-      if (!empRes.ok || !statsRes.ok) {
-        throw new Error('Gagal mengambil data dari server');
-      }
-
-      const empData = await empRes.json();
-      const statsData = await statsRes.json();
-      
-      if (Array.isArray(empData)) {
-        setEmployees(empData);
-      } else {
-        console.error('Data pegawai bukan array:', empData);
-        setEmployees([]);
-      }
-      
-      if (statsData && typeof statsData === 'object') {
-        setStats(statsData);
-      }
-    } catch (error: any) {
-      console.error('Error fetching data:', error);
-      const errMsg = error?.message || 'Gagal memuat data. Silakan refresh halaman.';
-      setError(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const handleOpenModal = (employee?: Employee) => {
     setError(null);
@@ -138,76 +179,60 @@ export default function App() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     setIsSaving(true);
     setError(null);
     
-    const url = editingEmployee ? `/api/employees/${editingEmployee.id}` : '/api/employees';
-    const method = editingEmployee ? 'PUT' : 'POST';
-    
-    console.log(`Attempting to save employee. URL: ${url}, Method: ${method}`);
-
-    const data = new FormData();
-    Object.entries(formData).forEach(([key, value]) => {
-      // Convert empty NIP to null-like behavior for the backend
-      if (key === 'nip' && !value) {
-        data.append(key, '');
-      } else {
-        data.append(key, value as string);
-      }
-    });
-    
-    Object.entries(files).forEach(([key, file]) => {
-      if (file) data.append(key, file as Blob);
-    });
-
     try {
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Accept': 'application/json',
-        },
-        body: data
-      });
+      const uploadedFiles: { [key: string]: string | null } = {};
       
-      const contentType = res.headers.get("content-type");
-      let result;
-      
-      if (contentType && contentType.includes("application/json")) {
-        result = await res.json();
+      // Upload files to Firebase Storage
+      for (const [key, file] of Object.entries(files)) {
+        if (file) {
+          const f = file as File;
+          const path = `employees/${Date.now()}_${f.name}`;
+          const url = await uploadFile(f, path);
+          uploadedFiles[key] = url;
+        } else if (editingEmployee) {
+          // Keep existing file URL if no new file uploaded
+          uploadedFiles[key] = (editingEmployee as any)[key] || null;
+        } else {
+          uploadedFiles[key] = null;
+        }
+      }
+
+      const employeeData = {
+        ...formData,
+        ...uploadedFiles,
+        updated_at: serverTimestamp(),
+      };
+
+      if (editingEmployee) {
+        const docRef = doc(db, 'employees', String(editingEmployee.id));
+        await updateDoc(docRef, employeeData);
       } else {
-        const text = await res.text();
-        console.error('Non-JSON response:', text);
-        throw new Error(`Server mengembalikan respon non-JSON (Status: ${res.status}). Silakan cek konsol untuk detail.`);
+        await addDoc(collection(db, 'employees'), {
+          ...employeeData,
+          created_at: serverTimestamp(),
+        });
       }
       
-      if (res.ok) {
-        setIsModalOpen(false);
-        fetchData();
-      } else {
-        const errorData = result?.error;
-        const errorMessage = typeof errorData === 'string' 
-          ? errorData 
-          : (errorData?.message || 'Terjadi kesalahan saat menyimpan data.');
-        setError(errorMessage);
-      }
+      setIsModalOpen(false);
     } catch (err: any) {
-      console.error('Error saving employee:', err);
-      const errMsg = err?.message || '';
-      setError(errMsg.includes('Server mengembalikan respon non-JSON') 
-        ? errMsg 
-        : 'Gagal menghubungi server. Pastikan koneksi internet aktif dan server berjalan.');
+      handleFirestoreError(err, editingEmployee ? OperationType.UPDATE : OperationType.CREATE, 'employees');
+      setError('Gagal menyimpan data ke Firebase. Silakan periksa koneksi dan izin Anda.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string | number) => {
+    if (!user) return;
     if (confirm('Apakah Anda yakin ingin menghapus data pegawai ini?')) {
       try {
-        const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' });
-        if (res.ok) fetchData();
+        await deleteDoc(doc(db, 'employees', String(id)));
       } catch (error) {
-        console.error('Error deleting employee:', error);
+        handleFirestoreError(error, OperationType.DELETE, `employees/${id}`);
       }
     }
   };
@@ -226,11 +251,47 @@ export default function App() {
     return matchesSearch && matchesCategory && matchesDivision;
   });
 
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center p-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl text-center space-y-8"
+        >
+          <div className="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mx-auto">
+            <Building2 size={40} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">KESBANGPOL</h1>
+            <p className="text-slate-500 mt-2">Silakan masuk untuk mengakses Database Pegawai</p>
+          </div>
+          <button 
+            onClick={loginWithGoogle}
+            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 hover:border-indigo-600 hover:bg-indigo-50 px-6 py-4 rounded-2xl font-bold transition-all group"
+          >
+            <LogIn className="text-slate-400 group-hover:text-indigo-600" size={24} />
+            <span>Masuk dengan Google</span>
+          </button>
+          <p className="text-xs text-slate-400">Hanya akun terdaftar yang dapat mengelola data.</p>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f5f5f5] text-slate-900 font-sans">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-200 z-20 hidden md:block print:hidden">
-        <div className="p-6 border-bottom border-slate-100">
+        <div className="p-6 border-bottom border-slate-100 h-full flex flex-col">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
               <Building2 size={24} />
@@ -241,7 +302,7 @@ export default function App() {
             </div>
           </div>
 
-          <nav className="space-y-1">
+          <nav className="space-y-1 flex-1">
             <button 
               onClick={() => setActiveTab('dashboard')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-slate-500 hover:bg-slate-50'}`}
@@ -264,6 +325,28 @@ export default function App() {
               <span>Laporan</span>
             </button>
           </nav>
+
+          <div className="pt-6 border-t border-slate-100">
+            <div className="flex items-center gap-3 mb-4 px-2">
+              <img 
+                src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
+                alt={user.displayName || 'User'} 
+                className="w-8 h-8 rounded-full border border-slate-200"
+                referrerPolicy="no-referrer"
+              />
+              <div className="overflow-hidden">
+                <p className="text-xs font-bold text-slate-800 truncate">{user.displayName}</p>
+                <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
+              </div>
+            </div>
+            <button 
+              onClick={logout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-medium"
+            >
+              <LogOut size={20} />
+              <span>Keluar</span>
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -327,28 +410,15 @@ export default function App() {
               <div className="flex items-center gap-3">
                 <AlertCircle className="text-amber-600" size={20} />
                 <div>
-                  <p className="text-sm font-bold text-amber-800">Tes Koneksi Server</p>
-                  <p className="text-xs text-amber-700">Gunakan ini jika Anda mengalami error "Page not found" saat menyimpan.</p>
+                  <p className="text-sm font-bold text-amber-800">Status Database Firebase</p>
+                  <p className="text-xs text-amber-700">Data sekarang tersimpan secara real-time di cloud.</p>
                 </div>
               </div>
               <button 
-                onClick={async () => {
-                  try {
-                    const currentUrl = window.location.href;
-                    const res = await fetch('/ping');
-                    const text = await res.text();
-                    if (text === 'pong') {
-                      alert(`Koneksi Berhasil!\nURL: ${currentUrl}\nServer merespon dengan benar.`);
-                    } else {
-                      alert(`Koneksi Bermasalah!\nURL: ${currentUrl}\nRespon: ${text}`);
-                    }
-                  } catch (e: any) {
-                    alert(`Koneksi Gagal!\nURL: ${window.location.href}\nError: ${e.message}`);
-                  }
-                }}
+                onClick={testConnection}
                 className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all"
               >
-                Cek Sekarang
+                Cek Koneksi
               </button>
             </div>
 
@@ -765,17 +835,17 @@ export default function App() {
                               </span>
                               <FileText size={14} className={files[doc.id] ? 'text-indigo-500' : 'text-slate-400'} />
                             </label>
-                            {editingEmployee && (editingEmployee as any)[doc.id] && (
-                              <a 
-                                href={`/uploads/${(editingEmployee as any)[doc.id]}`} 
-                                target="_blank" 
-                                rel="noreferrer"
-                                className="absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full shadow-sm hover:bg-emerald-600 transition-all"
-                                title="Lihat Dokumen Saat Ini"
-                              >
-                                <Download size={10} />
-                              </a>
-                            )}
+                      {editingEmployee && (selectedEmployee as any)[doc.id] && (
+                        <a 
+                          href={(selectedEmployee as any)[doc.id]} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full shadow-sm hover:bg-emerald-600 transition-all"
+                          title="Lihat Dokumen Saat Ini"
+                        >
+                          <Download size={10} />
+                        </a>
+                      )}
                           </div>
                         </div>
                       ))}

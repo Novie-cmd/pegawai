@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: employees
+    // Document ID: auto-generated
+    // Fields:
+    //   - name: string (required)
+    //   - nip: string (optional)
+    //   - position: string (required)
+    //   - category: string (required, 'ASN' or 'P3K')
+    //   - division: string (required)
+    //   - education: string (optional)
+    //   - religion: string (optional)
+    //   - phone: string (optional)
+    //   - email: string (optional, email format)
+    //   - doc_ktp: string (optional, URL)
+    //   - doc_sk_pangkat: string (optional, URL)
+    //   - doc_sk_berkala: string (optional, URL)
+    //   - doc_sk_jabatan: string (optional, URL)
+    //   - created_at: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "noviharyanto062@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string &&
+        (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function isValidEmployee(data) {
+      return data.keys().hasAll(['name', 'position', 'category', 'division', 'created_at']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+        data.position is string && data.position.size() > 0 && data.position.size() < 100 &&
+        data.category in ['ASN', 'P3K'] &&
+        data.division is string && data.division.size() > 0 && data.division.size() < 100 &&
+        (!('nip' in data) || data.nip is string || data.nip == null) &&
+        (!('education' in data) || data.education is string || data.education == null) &&
+        (!('religion' in data) || data.religion is string || data.religion == null) &&
+        (!('phone' in data) || data.phone is string || data.phone == null) &&
+        (!('email' in data) || data.email == null || isValidEmail(data.email)) &&
+        (!('doc_ktp' in data) || data.doc_ktp == null || isValidUrl(data.doc_ktp)) &&
+        (!('doc_sk_pangkat' in data) || data.doc_sk_pangkat == null || isValidUrl(data.doc_sk_pangkat)) &&
+        (!('doc_sk_berkala' in data) || data.doc_sk_berkala == null || isValidUrl(data.doc_sk_berkala)) &&
+        (!('doc_sk_jabatan' in data) || data.doc_sk_jabatan == null || isValidUrl(data.doc_sk_jabatan)) &&
+        data.created_at is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /employees/{employeeId} {
+      // For now, allow authenticated users to read and write (prototype)
+      // In production, we should restrict write to admins only or specific roles
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidEmployee(request.resource.data);
+      allow update: if isAuthenticated() && isValidEmployee(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+  }
+}
