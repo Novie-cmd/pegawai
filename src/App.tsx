@@ -67,6 +67,27 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'reports'>('dashboard');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleLogin = async () => {
+    setIsLoggingIn(true);
+    setLoginError(null);
+    try {
+      await loginWithGoogle();
+    } catch (err: any) {
+      console.error("Login error:", err);
+      if (err.code === 'auth/popup-blocked') {
+        setLoginError('Popup diblokir oleh browser. Silakan izinkan popup untuk situs ini.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setLoginError('Domain ini belum terdaftar di Firebase Authorized Domains. Silakan hubungi admin.');
+      } else {
+        setLoginError('Gagal masuk dengan Google. Silakan coba lagi.');
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -274,12 +295,23 @@ export default function App() {
             <h1 className="text-2xl font-bold text-slate-800">KESBANGPOL</h1>
             <p className="text-slate-500 mt-2">Silakan masuk untuk mengakses Database Pegawai</p>
           </div>
+          {loginError && (
+            <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm flex items-center gap-2">
+              <AlertCircle size={18} />
+              <span>{loginError}</span>
+            </div>
+          )}
           <button 
-            onClick={loginWithGoogle}
-            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 hover:border-indigo-600 hover:bg-indigo-50 px-6 py-4 rounded-2xl font-bold transition-all group"
+            onClick={handleLogin}
+            disabled={isLoggingIn}
+            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-slate-200 hover:border-indigo-600 hover:bg-indigo-50 px-6 py-4 rounded-2xl font-bold transition-all group disabled:opacity-50"
           >
-            <LogIn className="text-slate-400 group-hover:text-indigo-600" size={24} />
-            <span>Masuk dengan Google</span>
+            {isLoggingIn ? (
+              <div className="w-6 h-6 border-2 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin" />
+            ) : (
+              <LogIn className="text-slate-400 group-hover:text-indigo-600" size={24} />
+            )}
+            <span>{isLoggingIn ? 'Menghubungkan...' : 'Masuk dengan Google'}</span>
           </button>
           <p className="text-xs text-slate-400">Hanya akun terdaftar yang dapat mengelola data.</p>
         </motion.div>
