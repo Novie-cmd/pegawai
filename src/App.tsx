@@ -314,6 +314,15 @@ export default function App() {
             <span>{isLoggingIn ? 'Menghubungkan...' : 'Masuk dengan Google'}</span>
           </button>
           <p className="text-xs text-slate-400">Hanya akun terdaftar yang dapat mengelola data.</p>
+          <div className="pt-4 border-t border-slate-100">
+            <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2">Domain Aplikasi Ini:</p>
+            <code className="text-[10px] bg-slate-100 p-2 rounded block break-all text-slate-600 select-all">
+              {window.location.hostname}
+            </code>
+            <p className="text-[9px] text-slate-400 mt-2 italic">
+              *Pastikan domain di atas sudah terdaftar di Firebase Console (Authorized Domains) project <strong>pegawai-29bb6</strong>.
+            </p>
+          </div>
         </motion.div>
       </div>
     );
