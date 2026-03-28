@@ -40,6 +40,7 @@ import {
   query, 
   orderBy, 
   addDoc, 
+  setDoc,
   updateDoc, 
   deleteDoc, 
   doc, 
@@ -66,9 +67,11 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'employees' | 'reports' | 'settings'>('dashboard');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [appLogo, setAppLogo] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   const handleLogin = async () => {
     setIsLoggingIn(true);
@@ -139,6 +142,15 @@ export default function App() {
 
     return () => unsubscribe();
   }, [user]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'app'), (doc) => {
+      if (doc.exists()) {
+        setAppLogo(doc.data().logo_url);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -288,8 +300,12 @@ export default function App() {
           animate={{ opacity: 1, y: 0 }}
           className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl text-center space-y-8"
         >
-          <div className="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mx-auto">
-            <Building2 size={40} />
+          <div className="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mx-auto overflow-hidden">
+            {appLogo ? (
+              <img src={appLogo} alt="Logo" className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
+            ) : (
+              <Building2 size={40} />
+            )}
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-800">KESBANGPOL</h1>
@@ -325,8 +341,12 @@ export default function App() {
       <aside className="fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-200 z-20 hidden md:block print:hidden">
         <div className="p-6 border-bottom border-slate-100 h-full flex flex-col">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
-              <Building2 size={24} />
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white overflow-hidden">
+              {appLogo ? (
+                <img src={appLogo} alt="Logo" className="w-full h-full object-contain p-1" referrerPolicy="no-referrer" />
+              ) : (
+                <Building2 size={24} />
+              )}
             </div>
             <div>
               <h1 className="font-bold text-sm leading-tight">KESBANGPOL</h1>
@@ -356,6 +376,15 @@ export default function App() {
               <FileBarChart size={20} />
               <span>Laporan</span>
             </button>
+            {user?.email === 'noviharyanto062@gmail.com' && (
+              <button 
+                onClick={() => setActiveTab('settings')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'settings' ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-slate-500 hover:bg-slate-50'}`}
+              >
+                <Building2 size={20} />
+                <span>Pengaturan Logo</span>
+              </button>
+            )}
           </nav>
 
           <div className="pt-6 border-t border-slate-100">
@@ -387,11 +416,14 @@ export default function App() {
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 print:hidden">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">
-              {activeTab === 'dashboard' ? 'Ringkasan Statistik' : activeTab === 'employees' ? 'Manajemen Pegawai' : 'Laporan Detail Pegawai'}
+              {activeTab === 'dashboard' ? 'Ringkasan Statistik' : 
+               activeTab === 'employees' ? 'Manajemen Pegawai' : 
+               activeTab === 'reports' ? 'Laporan Detail Pegawai' : 
+               'Pengaturan Aplikasi'}
             </h2>
             <p className="text-slate-500 text-sm">Badan Kesatuan Bangsa dan Politik Dalam Negeri</p>
           </div>
-          {activeTab !== 'reports' ? (
+          {activeTab === 'dashboard' || activeTab === 'employees' ? (
             <button 
               onClick={() => handleOpenModal()}
               className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl transition-all shadow-sm shadow-indigo-200"
@@ -399,7 +431,7 @@ export default function App() {
               <UserPlus size={18} />
               <span>Tambah Pegawai</span>
             </button>
-          ) : (
+          ) : activeTab === 'reports' ? (
             <button 
               onClick={() => window.print()}
               className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl transition-all shadow-sm shadow-slate-200 print:hidden"
@@ -407,7 +439,7 @@ export default function App() {
               <Printer size={18} />
               <span>Cetak Laporan</span>
             </button>
-          )}
+          ) : null}
         </header>
 
         {activeTab === 'dashboard' ? (
@@ -582,7 +614,7 @@ export default function App() {
               </table>
             </div>
           </div>
-        ) : (
+        ) : activeTab === 'reports' ? (
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-6 print:p-0 print:border-none print:shadow-none">
             {/* Print Header */}
             <div className="hidden print:block mb-8 text-center border-b-2 border-slate-800 pb-4">
@@ -693,7 +725,83 @@ export default function App() {
               </div>
             </div>
           </div>
-        )}
+        ) : activeTab === 'settings' ? (
+          <div className="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+            <h3 className="text-xl font-bold text-slate-800 mb-6">Pengaturan Logo Aplikasi</h3>
+            <div className="space-y-8">
+              <div className="flex flex-col items-center gap-6 p-8 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50">
+                <div className="w-32 h-32 bg-white rounded-2xl shadow-md flex items-center justify-center overflow-hidden border border-slate-100">
+                  {appLogo ? (
+                    <img src={appLogo} alt="App Logo" className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
+                  ) : (
+                    <Building2 size={48} className="text-slate-300" />
+                  )}
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-bold text-slate-800">Logo Saat Ini</p>
+                  <p className="text-xs text-slate-500 mt-1">Logo ini akan muncul di halaman login dan sidebar.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block text-sm font-bold text-slate-700">Ganti Logo Baru</label>
+                <div className="flex items-center gap-4">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    id="logo-upload" 
+                    className="hidden" 
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setIsUploadingLogo(true);
+                      try {
+                        const path = `settings/logo_${Date.now()}`;
+                        const url = await uploadFile(file, path);
+                        await setDoc(doc(db, 'settings', 'app'), {
+                          logo_url: url,
+                          updated_at: serverTimestamp()
+                        }, { merge: true });
+                      } catch (err) {
+                        console.error("Error uploading logo:", err);
+                        alert("Gagal mengupload logo.");
+                      } finally {
+                        setIsUploadingLogo(false);
+                      }
+                    }}
+                  />
+                  <label 
+                    htmlFor="logo-upload" 
+                    className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl border-2 border-indigo-600 text-indigo-600 font-bold hover:bg-indigo-50 cursor-pointer transition-all ${isUploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    {isUploadingLogo ? (
+                      <div className="w-5 h-5 border-2 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin" />
+                    ) : (
+                      <Upload size={20} />
+                    )}
+                    <span>{isUploadingLogo ? 'Mengunggah...' : 'Pilih Logo Baru'}</span>
+                  </label>
+                  {appLogo && (
+                    <button 
+                      onClick={async () => {
+                        if (confirm('Hapus logo dan kembali ke default?')) {
+                          await updateDoc(doc(db, 'settings', 'app'), {
+                            logo_url: null,
+                            updated_at: serverTimestamp()
+                          });
+                        }
+                      }}
+                      className="p-4 text-red-500 hover:bg-red-50 rounded-2xl border-2 border-transparent hover:border-red-100 transition-all"
+                    >
+                      <Trash2 size={24} />
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-400 italic">Format yang disarankan: PNG atau JPG dengan latar belakang transparan.</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
 
       {/* Modal Form */}
