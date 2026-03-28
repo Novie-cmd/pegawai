@@ -155,7 +155,7 @@ export default function App() {
         }
         setIsSettingsLoading(false);
       }, (error) => {
-        console.error("Error fetching settings:", error);
+        handleFirestoreError(error, OperationType.GET, 'settings/app');
         setSettingsError("Gagal memuat pengaturan logo. Silakan coba lagi.");
         setIsSettingsLoading(false);
       });

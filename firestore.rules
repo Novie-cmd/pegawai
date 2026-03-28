@@ -84,9 +84,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Settings collection
     match /settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // Test collection for connection check
+    match /test/{docId} {
+      allow read, write: if true;
     }
   }
 }
