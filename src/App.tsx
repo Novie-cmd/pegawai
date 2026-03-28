@@ -61,6 +61,28 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<'ALL' | 'ASN' | 'P3K'>('ALL');
   const [filterDivision, setFilterDivision] = useState<string>('ALL');
+  const [reportType, setReportType] = useState<'ALL' | 'SALARY' | 'PROMOTION'>('ALL');
+  const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
+  const [reportYear, setReportYear] = useState(new Date().getFullYear());
+
+  const getNextSalaryDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    date.setFullYear(date.getFullYear() + 2);
+    return date;
+  };
+
+  const getNextPromotionDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    date.setFullYear(date.getFullYear() + 4);
+    return date;
+  };
+
+  const isDueThisMonth = (date: Date | null, month: number, year: number) => {
+    if (!date) return false;
+    return date.getMonth() + 1 === month && date.getFullYear() === year;
+  };
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -301,6 +323,31 @@ export default function App() {
                          position.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = filterCategory === 'ALL' || emp.category === filterCategory;
     const matchesDivision = filterDivision === 'ALL' || emp.division === filterDivision;
+    return matchesSearch && matchesCategory && matchesDivision;
+  });
+
+  const filteredReportEmployees = employees.filter(emp => {
+    if (!emp) return false;
+    const name = emp.name || '';
+    const nip = emp.nip || '';
+    const position = emp.position || '';
+    
+    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         nip.includes(searchTerm) ||
+                         position.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = filterCategory === 'ALL' || emp.category === filterCategory;
+    const matchesDivision = filterDivision === 'ALL' || emp.division === filterDivision;
+
+    if (reportType === 'SALARY') {
+      const nextDate = getNextSalaryDate(emp.last_salary_periodic_date);
+      return matchesSearch && matchesCategory && matchesDivision && isDueThisMonth(nextDate, reportMonth, reportYear);
+    }
+
+    if (reportType === 'PROMOTION') {
+      const nextDate = getNextPromotionDate(emp.last_promotion_date);
+      return matchesSearch && matchesCategory && matchesDivision && isDueThisMonth(nextDate, reportMonth, reportYear);
+    }
+
     return matchesSearch && matchesCategory && matchesDivision;
   });
 
@@ -639,6 +686,8 @@ export default function App() {
             {/* Print Header */}
             <div className="hidden print:block mb-8 text-center border-b-2 border-slate-800 pb-4">
               <h1 className="text-xl font-bold uppercase">Laporan Data Pegawai</h1>
+              {reportType === 'SALARY' && <p className="text-sm font-bold">Estimasi Kenaikan Gaji Berkala - {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'][reportMonth - 1]} {reportYear}</p>}
+              {reportType === 'PROMOTION' && <p className="text-sm font-bold">Estimasi Kenaikan Pangkat - {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'][reportMonth - 1]} {reportYear}</p>}
               <p className="text-sm">Badan Kesatuan Bangsa dan Politik Dalam Negeri</p>
               <p className="text-[10px] mt-1 italic">Dicetak pada: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
@@ -674,6 +723,41 @@ export default function App() {
                 <option value="Bidang Politik Dalam Negeri">Bidang Politik Dalam Negeri</option>
                 <option value="Bidang Kewaspadaan Nasional">Bidang Kewaspadaan Nasional</option>
               </select>
+
+              <div className="flex items-center gap-2 border-l pl-4 border-slate-200">
+                <select 
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  value={reportType}
+                  onChange={(e) => setReportType(e.target.value as any)}
+                >
+                  <option value="ALL">Semua Data</option>
+                  <option value="SALARY">Kenaikan Gaji Berkala</option>
+                  <option value="PROMOTION">Kenaikan Pangkat</option>
+                </select>
+
+                {reportType !== 'ALL' && (
+                  <>
+                    <select 
+                      className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      value={reportMonth}
+                      onChange={(e) => setReportMonth(parseInt(e.target.value))}
+                    >
+                      {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map((m, i) => (
+                        <option key={m} value={i + 1}>{m}</option>
+                      ))}
+                    </select>
+                    <select 
+                      className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      value={reportYear}
+                      onChange={(e) => setReportYear(parseInt(e.target.value))}
+                    >
+                      {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -686,15 +770,23 @@ export default function App() {
                     <th className="border border-slate-200 px-2 py-2">Jabatan</th>
                     <th className="border border-slate-200 px-2 py-2">Bidang</th>
                     <th className="border border-slate-200 px-2 py-2">Kategori</th>
-                    <th className="border border-slate-200 px-2 py-2">Pendidikan</th>
-                    <th className="border border-slate-200 px-2 py-2">Agama</th>
-                    <th className="border border-slate-200 px-2 py-2">Kontak</th>
+                    {reportType === 'SALARY' && <th className="border border-slate-200 px-2 py-2">Tgl Gaji Terakhir</th>}
+                    {reportType === 'SALARY' && <th className="border border-slate-200 px-2 py-2">Estimasi Gaji Berikutnya</th>}
+                    {reportType === 'PROMOTION' && <th className="border border-slate-200 px-2 py-2">Tgl Pangkat Terakhir</th>}
+                    {reportType === 'PROMOTION' && <th className="border border-slate-200 px-2 py-2">Estimasi Pangkat Berikutnya</th>}
+                    {reportType === 'ALL' && (
+                      <>
+                        <th className="border border-slate-200 px-2 py-2">Pendidikan</th>
+                        <th className="border border-slate-200 px-2 py-2">Agama</th>
+                        <th className="border border-slate-200 px-2 py-2">Kontak</th>
+                      </>
+                    )}
                     <th className="border border-slate-200 px-2 py-2 text-center">Dokumen</th>
                     <th className="border border-slate-200 px-2 py-2 text-center print:hidden">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredEmployees.map((emp, index) => (
+                  {filteredReportEmployees.map((emp, index) => (
                     <tr key={emp.id} className="hover:bg-slate-50">
                       <td className="border border-slate-200 px-2 py-2 text-center">{index + 1}</td>
                       <td className="border border-slate-200 px-2 py-2 font-semibold">{emp.name}</td>
@@ -702,14 +794,41 @@ export default function App() {
                       <td className="border border-slate-200 px-2 py-2">{emp.position}</td>
                       <td className="border border-slate-200 px-2 py-2">{emp.division}</td>
                       <td className="border border-slate-200 px-2 py-2">{emp.category === 'ASN' ? 'ASN' : 'P3K'}</td>
-                      <td className="border border-slate-200 px-2 py-2">{emp.education || '-'}</td>
-                      <td className="border border-slate-200 px-2 py-2">{emp.religion || '-'}</td>
-                      <td className="border border-slate-200 px-2 py-2">
-                        <div className="text-[9px]">
-                          {emp.phone && <div>{emp.phone}</div>}
-                          {emp.email && <div className="truncate max-w-[100px]">{emp.email}</div>}
-                        </div>
-                      </td>
+                      
+                      {reportType === 'SALARY' && (
+                        <>
+                          <td className="border border-slate-200 px-2 py-2">
+                            {emp.last_salary_periodic_date ? new Date(emp.last_salary_periodic_date).toLocaleDateString('id-ID') : '-'}
+                          </td>
+                          <td className="border border-slate-200 px-2 py-2 font-bold text-indigo-600">
+                            {getNextSalaryDate(emp.last_salary_periodic_date)?.toLocaleDateString('id-ID') || '-'}
+                          </td>
+                        </>
+                      )}
+
+                      {reportType === 'PROMOTION' && (
+                        <>
+                          <td className="border border-slate-200 px-2 py-2">
+                            {emp.last_promotion_date ? new Date(emp.last_promotion_date).toLocaleDateString('id-ID') : '-'}
+                          </td>
+                          <td className="border border-slate-200 px-2 py-2 font-bold text-indigo-600">
+                            {getNextPromotionDate(emp.last_promotion_date)?.toLocaleDateString('id-ID') || '-'}
+                          </td>
+                        </>
+                      )}
+
+                      {reportType === 'ALL' && (
+                        <>
+                          <td className="border border-slate-200 px-2 py-2">{emp.education || '-'}</td>
+                          <td className="border border-slate-200 px-2 py-2">{emp.religion || '-'}</td>
+                          <td className="border border-slate-200 px-2 py-2">
+                            <div className="text-[9px]">
+                              {emp.phone && <div>{emp.phone}</div>}
+                              {emp.email && <div className="truncate max-w-[100px]">{emp.email}</div>}
+                            </div>
+                          </td>
+                        </>
+                      )}
                       <td className="border border-slate-200 px-2 py-2 text-center">
                         <div className="flex justify-center gap-1">
                           <div className={`w-2 h-2 rounded-full ${emp.doc_ktp ? 'bg-emerald-500' : 'bg-slate-200'}`} title="KTP" />
@@ -731,6 +850,13 @@ export default function App() {
                       </td>
                     </tr>
                   ))}
+                  {filteredReportEmployees.length === 0 && (
+                    <tr>
+                      <td colSpan={reportType === 'ALL' ? 11 : 10} className="px-6 py-12 text-center text-slate-400 italic">
+                        Tidak ada data pegawai yang sesuai dengan kriteria laporan.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
