@@ -63,6 +63,8 @@ service cloud.firestore {
         (!('doc_sk_pangkat' in data) || data.doc_sk_pangkat == null || isValidUrl(data.doc_sk_pangkat)) &&
         (!('doc_sk_berkala' in data) || data.doc_sk_berkala == null || isValidUrl(data.doc_sk_berkala)) &&
         (!('doc_sk_jabatan' in data) || data.doc_sk_jabatan == null || isValidUrl(data.doc_sk_jabatan)) &&
+        (!('last_salary_periodic_date' in data) || data.last_salary_periodic_date is string || data.last_salary_periodic_date == null) &&
+        (!('last_promotion_date' in data) || data.last_promotion_date is string || data.last_promotion_date == null) &&
         data.created_at is timestamp;
     }
 

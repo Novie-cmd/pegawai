@@ -18,6 +18,8 @@
         "doc_sk_pangkat": { "type": "string", "description": "SK Pangkat document URL" },
         "doc_sk_berkala": { "type": "string", "description": "SK Berkala document URL" },
         "doc_sk_jabatan": { "type": "string", "description": "SK Jabatan document URL" },
+        "last_salary_periodic_date": { "type": "string", "format": "date", "description": "Last periodic salary date" },
+        "last_promotion_date": { "type": "string", "format": "date", "description": "Last promotion date" },
         "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
       },
       "required": ["name", "position", "category", "division"]

@@ -176,7 +176,9 @@ export default function App() {
     education: '',
     religion: '',
     phone: '',
-    email: ''
+    email: '',
+    last_salary_periodic_date: '',
+    last_promotion_date: ''
   });
 
   const [files, setFiles] = useState<{ [key: string]: File | null }>({
@@ -199,7 +201,9 @@ export default function App() {
         education: employee.education || '',
         religion: employee.religion || '',
         phone: employee.phone || '',
-        email: employee.email || ''
+        email: employee.email || '',
+        last_salary_periodic_date: employee.last_salary_periodic_date || '',
+        last_promotion_date: employee.last_promotion_date || ''
       });
     } else {
       setEditingEmployee(null);
@@ -212,7 +216,9 @@ export default function App() {
         education: '',
         religion: '',
         phone: '',
-        email: ''
+        email: '',
+        last_salary_periodic_date: '',
+        last_promotion_date: ''
       });
     }
     setFiles({
@@ -983,6 +989,24 @@ export default function App() {
                         className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                         value={formData.email}
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tanggal Gaji Berkala Terakhir</label>
+                      <input 
+                        type="date" 
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={formData.last_salary_periodic_date}
+                        onChange={(e) => setFormData({...formData, last_salary_periodic_date: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tanggal Kenaikan Pangkat Terakhir</label>
+                      <input 
+                        type="date" 
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        value={formData.last_promotion_date}
+                        onChange={(e) => setFormData({...formData, last_promotion_date: e.target.value})}
                       />
                     </div>
                   </div>

@@ -13,6 +13,8 @@ export interface Employee {
   doc_sk_pangkat: string | null;
   doc_sk_berkala: string | null;
   doc_sk_jabatan: string | null;
+  last_salary_periodic_date: string | null;
+  last_promotion_date: string | null;
   created_at: string;
 }
 
