@@ -867,9 +867,9 @@ export default function App() {
                               </span>
                               <FileText size={14} className={files[doc.id] ? 'text-indigo-500' : 'text-slate-400'} />
                             </label>
-                      {editingEmployee && (selectedEmployee as any)[doc.id] && (
+                      {editingEmployee && (editingEmployee as any)[doc.id] && (
                         <a 
-                          href={(selectedEmployee as any)[doc.id]} 
+                          href={(editingEmployee as any)[doc.id]} 
                           target="_blank" 
                           rel="noreferrer"
                           className="absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full shadow-sm hover:bg-emerald-600 transition-all"
