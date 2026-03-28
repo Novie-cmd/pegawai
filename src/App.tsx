@@ -72,6 +72,8 @@ export default function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [appLogo, setAppLogo] = useState<string | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isSettingsLoading, setIsSettingsLoading] = useState(true);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const handleLogin = async () => {
     setIsLoggingIn(true);
@@ -144,11 +146,23 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'app'), (doc) => {
-      if (doc.exists()) {
-        setAppLogo(doc.data().logo_url);
-      }
-    });
+    const fetchSettings = () => {
+      setIsSettingsLoading(true);
+      setSettingsError(null);
+      const unsubscribe = onSnapshot(doc(db, 'settings', 'app'), (doc) => {
+        if (doc.exists()) {
+          setAppLogo(doc.data().logo_url);
+        }
+        setIsSettingsLoading(false);
+      }, (error) => {
+        console.error("Error fetching settings:", error);
+        setSettingsError("Gagal memuat pengaturan logo. Silakan coba lagi.");
+        setIsSettingsLoading(false);
+      });
+      return unsubscribe;
+    };
+
+    const unsubscribe = fetchSettings();
     return () => unsubscribe();
   }, []);
 
@@ -726,80 +740,112 @@ export default function App() {
             </div>
           </div>
         ) : activeTab === 'settings' ? (
-          <div className="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-            <h3 className="text-xl font-bold text-slate-800 mb-6">Pengaturan Logo Aplikasi</h3>
-            <div className="space-y-8">
-              <div className="flex flex-col items-center gap-6 p-8 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50">
-                <div className="w-32 h-32 bg-white rounded-2xl shadow-md flex items-center justify-center overflow-hidden border border-slate-100">
-                  {appLogo ? (
-                    <img src={appLogo} alt="App Logo" className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
-                  ) : (
-                    <Building2 size={48} className="text-slate-300" />
-                  )}
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-slate-800">Logo Saat Ini</p>
-                  <p className="text-xs text-slate-500 mt-1">Logo ini akan muncul di halaman login dan sidebar.</p>
-                </div>
+          <div className="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-slate-100 min-h-[400px] flex flex-col">
+            {isSettingsLoading ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                <div className="w-12 h-12 border-4 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin" />
+                <p className="text-slate-500 font-medium animate-pulse">Memuat pengaturan...</p>
               </div>
+            ) : settingsError ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center">
+                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center">
+                  <AlertCircle size={32} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">Gagal Memuat Data</h3>
+                  <p className="text-slate-500 text-sm mt-1">{settingsError}</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setIsSettingsLoading(true);
+                    setSettingsError(null);
+                    // The onSnapshot will automatically retry or we can force a re-mount if needed
+                    // but since it's a listener, it should be fine. 
+                    // Let's just trigger a manual check
+                    testConnection();
+                  }}
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all"
+                >
+                  Coba Lagi
+                </button>
+              </div>
+            ) : (
+              <>
+                <h3 className="text-xl font-bold text-slate-800 mb-6">Pengaturan Logo Aplikasi</h3>
+                <div className="space-y-8">
+                  <div className="flex flex-col items-center gap-6 p-8 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50">
+                    <div className="w-32 h-32 bg-white rounded-2xl shadow-md flex items-center justify-center overflow-hidden border border-slate-100">
+                      {appLogo ? (
+                        <img src={appLogo} alt="App Logo" className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
+                      ) : (
+                        <Building2 size={48} className="text-slate-300" />
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-slate-800">Logo Saat Ini</p>
+                      <p className="text-xs text-slate-500 mt-1">Logo ini akan muncul di halaman login dan sidebar.</p>
+                    </div>
+                  </div>
 
-              <div className="space-y-4">
-                <label className="block text-sm font-bold text-slate-700">Ganti Logo Baru</label>
-                <div className="flex items-center gap-4">
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    id="logo-upload" 
-                    className="hidden" 
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      setIsUploadingLogo(true);
-                      try {
-                        const path = `settings/logo_${Date.now()}`;
-                        const url = await uploadFile(file, path);
-                        await setDoc(doc(db, 'settings', 'app'), {
-                          logo_url: url,
-                          updated_at: serverTimestamp()
-                        }, { merge: true });
-                      } catch (err) {
-                        console.error("Error uploading logo:", err);
-                        alert("Gagal mengupload logo.");
-                      } finally {
-                        setIsUploadingLogo(false);
-                      }
-                    }}
-                  />
-                  <label 
-                    htmlFor="logo-upload" 
-                    className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl border-2 border-indigo-600 text-indigo-600 font-bold hover:bg-indigo-50 cursor-pointer transition-all ${isUploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}
-                  >
-                    {isUploadingLogo ? (
-                      <div className="w-5 h-5 border-2 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin" />
-                    ) : (
-                      <Upload size={20} />
-                    )}
-                    <span>{isUploadingLogo ? 'Mengunggah...' : 'Pilih Logo Baru'}</span>
-                  </label>
-                  {appLogo && (
-                    <button 
-                      onClick={async () => {
-                        if (confirm('Hapus logo dan kembali ke default?')) {
-                          await updateDoc(doc(db, 'settings', 'app'), {
-                            logo_url: null,
-                            updated_at: serverTimestamp()
-                          });
-                        }
-                      }}
-                      className="p-4 text-red-500 hover:bg-red-50 rounded-2xl border-2 border-transparent hover:border-red-100 transition-all"
-                    >
-                      <Trash2 size={24} />
-                    </button>
-                  )}
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-slate-700">Ganti Logo Baru</label>
+                    <div className="flex items-center gap-4">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        id="logo-upload" 
+                        className="hidden" 
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          setIsUploadingLogo(true);
+                          try {
+                            const path = `settings/logo_${Date.now()}`;
+                            const url = await uploadFile(file, path);
+                            await setDoc(doc(db, 'settings', 'app'), {
+                              logo_url: url,
+                              updated_at: serverTimestamp()
+                            }, { merge: true });
+                          } catch (err) {
+                            console.error("Error uploading logo:", err);
+                            alert("Gagal mengupload logo.");
+                          } finally {
+                            setIsUploadingLogo(false);
+                          }
+                        }}
+                      />
+                      <label 
+                        htmlFor="logo-upload" 
+                        className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-2xl border-2 border-indigo-600 text-indigo-600 font-bold hover:bg-indigo-50 cursor-pointer transition-all ${isUploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}
+                      >
+                        {isUploadingLogo ? (
+                          <div className="w-5 h-5 border-2 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin" />
+                        ) : (
+                          <Upload size={20} />
+                        )}
+                        <span>{isUploadingLogo ? 'Mengunggah...' : 'Pilih Logo Baru'}</span>
+                      </label>
+                      {appLogo && (
+                        <button 
+                          onClick={async () => {
+                            if (confirm('Hapus logo dan kembali ke default?')) {
+                              await updateDoc(doc(db, 'settings', 'app'), {
+                                logo_url: null,
+                                updated_at: serverTimestamp()
+                              });
+                            }
+                          }}
+                          className="p-4 text-red-500 hover:bg-red-50 rounded-2xl border-2 border-transparent hover:border-red-100 transition-all"
+                        >
+                          <Trash2 size={24} />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 italic">Format yang disarankan: PNG atau JPG dengan latar belakang transparan.</p>
+                  </div>
                 </div>
-                <p className="text-[10px] text-slate-400 italic">Format yang disarankan: PNG atau JPG dengan latar belakang transparan.</p>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         ) : null}
       </main>
