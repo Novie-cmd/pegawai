@@ -1207,7 +1207,7 @@ export default function App() {
                           </div>
                           {fileName ? (
                             <a 
-                              href={`/uploads/${fileName}`} 
+                              href={fileName} 
                               target="_blank" 
                               rel="noreferrer"
                               className="p-2 bg-white text-emerald-600 rounded-xl shadow-sm hover:bg-emerald-100 transition-all"
