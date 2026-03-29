@@ -16,11 +16,7 @@ service firebase.storage {
 
     // Employees documents
     match /employees/{allPaths=**} {
-      // Allow authenticated users to read
-      allow read: if isAuthenticated();
-      
-      // Allow authenticated users to write (for testing)
-      allow write: if isAuthenticated();
+      allow read, write: if isAuthenticated();
       allow delete: if isAdmin();
     }
     

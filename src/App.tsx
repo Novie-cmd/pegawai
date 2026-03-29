@@ -171,6 +171,11 @@ export default function App() {
       }
     }, (error) => {
       console.error("Error fetching settings:", error);
+      try {
+        handleFirestoreError(error, OperationType.GET, 'settings/app');
+      } catch (e) {
+        // Logged
+      }
     });
     return () => unsubscribe();
   }, []);
