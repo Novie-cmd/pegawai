@@ -72,6 +72,12 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    // Settings collection - Public read
+    match /settings/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /employees/{employeeId} {
       // For now, allow authenticated users to read and write (prototype)
       // In production, we should restrict write to admins only or specific roles
@@ -87,12 +93,6 @@ service cloud.firestore {
     }
 
     // Settings collection
-    match /settings/{settingId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // Test collection for connection check
     match /test/{docId} {
       allow read, write: if true;
     }
