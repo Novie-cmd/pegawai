@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// Craft rules based on data model in firebase-blueprint.json
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is an admin
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "noviharyanto062@gmail.com" && request.auth.token.email_verified == true);
+    }
+
+    // Employees documents
+    match /employees/{fileName} {
+      // Allow authenticated users to read
+      allow read: if isAuthenticated();
+      
+      // Allow only admins to write/delete
+      allow write, delete: if isAdmin();
+    }
+    
+    // Settings (logos, etc)
+    match /settings/{fileName} {
+      allow read: if true;
+      allow write, delete: if isAdmin();
+    }
+  }
+}

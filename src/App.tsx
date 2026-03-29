@@ -248,20 +248,29 @@ export default function App() {
     try {
       const uploadedFiles: { [key: string]: string | null } = {};
       
-      // Upload files to Firebase Storage
-      for (const [key, file] of Object.entries(files)) {
+      // Prepare upload promises
+      const uploadPromises = Object.entries(files).map(async ([key, file]) => {
         if (file) {
           const f = file as File;
           const path = `employees/${Date.now()}_${f.name}`;
-          const url = await uploadFile(f, path);
-          uploadedFiles[key] = url;
+          try {
+            const url = await uploadFile(f, path);
+            return { key, url };
+          } catch (uploadErr) {
+            console.error(`Error uploading ${key}:`, uploadErr);
+            throw new Error(`Gagal mengunggah dokumen ${key}. Silakan coba lagi.`);
+          }
         } else if (editingEmployee) {
-          // Keep existing file URL if no new file uploaded
-          uploadedFiles[key] = (editingEmployee as any)[key] || null;
+          return { key, url: (editingEmployee as any)[key] || null };
         } else {
-          uploadedFiles[key] = null;
+          return { key, url: null };
         }
-      }
+      });
+
+      const results = await Promise.all(uploadPromises);
+      results.forEach(({ key, url }) => {
+        uploadedFiles[key] = url;
+      });
 
       const employeeData = {
         ...formData,
@@ -281,8 +290,17 @@ export default function App() {
       
       setIsModalOpen(false);
     } catch (err: any) {
-      handleFirestoreError(err, editingEmployee ? OperationType.UPDATE : OperationType.CREATE, 'employees');
-      setError('Gagal menyimpan data ke Firebase. Silakan periksa koneksi dan izin Anda.');
+      console.error("Submit error:", err);
+      if (err.message && err.message.includes('Gagal mengunggah dokumen')) {
+        setError(err.message);
+      } else {
+        try {
+          handleFirestoreError(err, editingEmployee ? OperationType.UPDATE : OperationType.CREATE, 'employees');
+        } catch (e) {
+          // If handleFirestoreError throws, it's already logged
+        }
+        setError('Gagal menyimpan data ke Firebase. Silakan periksa koneksi dan izin Anda.');
+      }
     } finally {
       setIsSaving(false);
     }
