@@ -197,8 +197,16 @@ export default function App() {
     doc_sk_jabatan: null
   });
 
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({
+    doc_ktp: 0,
+    doc_sk_pangkat: 0,
+    doc_sk_berkala: 0,
+    doc_sk_jabatan: 0
+  });
+
   const handleOpenModal = (employee?: Employee) => {
     setError(null);
+    setIsSaving(false);
     if (employee) {
       setEditingEmployee(employee);
       setFormData({
@@ -236,6 +244,12 @@ export default function App() {
       doc_sk_berkala: null,
       doc_sk_jabatan: null
     });
+    setUploadProgress({
+      doc_ktp: 0,
+      doc_sk_pangkat: 0,
+      doc_sk_berkala: 0,
+      doc_sk_jabatan: 0
+    });
     setIsModalOpen(true);
   };
 
@@ -254,11 +268,14 @@ export default function App() {
           const f = file as File;
           const path = `employees/${Date.now()}_${f.name}`;
           try {
-            const url = await uploadFile(f, path);
+            const url = await uploadFile(f, path, (progress) => {
+              setUploadProgress(prev => ({ ...prev, [key]: progress }));
+            });
+            console.log(`Successfully uploaded ${key} to ${url}`);
             return { key, url };
-          } catch (uploadErr) {
+          } catch (uploadErr: any) {
             console.error(`Error uploading ${key}:`, uploadErr);
-            throw new Error(`Gagal mengunggah dokumen ${key}. Silakan coba lagi.`);
+            throw new Error(`Gagal mengunggah dokumen ${key}: ${uploadErr.message || 'Kesalahan tidak diketahui'}`);
           }
         } else if (editingEmployee) {
           return { key, url: (editingEmployee as any)[key] || null };
@@ -272,11 +289,19 @@ export default function App() {
         uploadedFiles[key] = url;
       });
 
+      // Clean up form data: convert empty strings to null for optional fields
+      const cleanedFormData = Object.entries(formData).reduce((acc, [key, value]) => {
+        acc[key] = value === '' ? null : value;
+        return acc;
+      }, {} as any);
+
       const employeeData = {
-        ...formData,
+        ...cleanedFormData,
         ...uploadedFiles,
         updated_at: serverTimestamp(),
       };
+
+      console.log("Saving employee data:", employeeData);
 
       if (editingEmployee) {
         const docRef = doc(db, 'employees', String(editingEmployee.id));
@@ -1058,6 +1083,14 @@ export default function App() {
                               </span>
                               <FileText size={14} className={files[doc.id] ? 'text-indigo-500' : 'text-slate-400'} />
                             </label>
+                            {uploadProgress[doc.id] > 0 && uploadProgress[doc.id] < 100 && (
+                              <div className="absolute -bottom-1 left-0 w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-indigo-500 transition-all duration-300" 
+                                  style={{ width: `${uploadProgress[doc.id]}%` }}
+                                />
+                              </div>
+                            )}
                       {editingEmployee && (editingEmployee as any)[doc.id] && (
                         <a 
                           href={(editingEmployee as any)[doc.id]} 

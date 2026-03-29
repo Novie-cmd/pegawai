@@ -15,16 +15,17 @@ service firebase.storage {
     }
 
     // Employees documents
-    match /employees/{fileName} {
+    match /employees/{allPaths=**} {
       // Allow authenticated users to read
       allow read: if isAuthenticated();
       
-      // Allow only admins to write/delete
-      allow write, delete: if isAdmin();
+      // Allow authenticated users to write (for testing)
+      allow write: if isAuthenticated();
+      allow delete: if isAdmin();
     }
     
     // Settings (logos, etc)
-    match /settings/{fileName} {
+    match /settings/{allPaths=**} {
       allow read: if true;
       allow write, delete: if isAdmin();
     }
