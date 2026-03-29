@@ -25,6 +25,12 @@ service cloud.firestore {
     //
     // ===============================================================
 
+    // Settings collection - Public read
+    match /settings/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // ===============================================================
     // Helper Functions
     // ===============================================================
@@ -34,8 +40,9 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "noviharyanto062@gmail.com"));
+        (request.auth.token.email == "noviharyanto062@gmail.com" ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
 
     function isValidEmail(email) {
@@ -72,12 +79,6 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
-    // Settings collection - Public read
-    match /settings/{allPaths=**} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
     match /employees/{employeeId} {
       // For now, allow authenticated users to read and write (prototype)
       // In production, we should restrict write to admins only or specific roles
@@ -92,7 +93,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Settings collection
+    // Test collection
     match /test/{docId} {
       allow read, write: if true;
     }
